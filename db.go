@@ -71,3 +71,12 @@ func (c *Client) getLatestProduct(system string, appID string) (Product, error) 
 	err := c.Engine.Table(c.Schema).Where("system = ? AND app_id = ? and removed_time is null", system, appID).Order("created_time desc").First(&product).Error
 	return product, err
 }
+
+func (c *Client) getAllProducts(system string, appID string) ([]Product, error) {
+	var products []Product
+	err := c.Engine.Table(c.Schema).
+		Where("system = ? AND app_id = ? AND removed_time IS NULL", system, appID).
+		Order("created_time ASC, id ASC").
+		Find(&products).Error
+	return products, err
+}

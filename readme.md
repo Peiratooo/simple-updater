@@ -290,6 +290,20 @@ if err != nil {
 
 DownloadLatestSetup 只负责下载，不会直接安装。只查询元数据时使用 GetLatestSetupInfo。
 
+按发布时间从旧到新获取全部未删除版本：
+
+~~~go
+versions, err := client.GetAllSetupInfo("windows", "com.example.demo")
+if err != nil {
+	log.Fatal(err)
+}
+for _, version := range versions {
+	fmt.Println(version.Version, version.CreatedTime)
+}
+~~~
+
+没有匹配版本时返回空切片和 nil error。
+
 ## 6. 直接准备目录并执行更新
 
 不使用 DownloadPatch 时，也可以自己准备一个更新目录。目录必须包含 manifest.json 和对应的 payload 文件：
@@ -422,6 +436,7 @@ ReadInfoPlist 读取 Contents/Info.plist，并要求 CFBundleIdentifier、CFBund
 | (*Client).Push(setup SetupReader) (*Product, error) | 分析并上传 EXE/DMG，同时写入产品元数据 |
 | (*Client).Compare(system, appID string, files []File) ([]File, error) | 查询最新未删除版本，返回本地缺失或已变化的文件 |
 | (*Client).GetLatestSetupInfo(system, appID string) (*Product, error) | 只读取最新安装包的数据库元数据 |
+| (*Client).GetAllSetupInfo(system, appID string) ([]Product, error) | 按创建时间从旧到新返回全部未删除版本 |
 | (*Client).DownloadLatestSetup(system, appID string) (*Product, error) | 读取最新元数据，并把安装包内容放到 Product.Bytes |
 | (*Client).DownloadFile(path string) ([]byte, error) | 按 OSS object key 下载一个对象 |
 | (*Client).DownloadPatch(files []File) ([]byte, error) | 下载指定文件并生成 gzip+tar 差分包 |
