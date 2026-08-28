@@ -3,7 +3,7 @@ module github.com/Peiratooo/simple-updater
 go 1.26.5
 
 require (
-	github.com/Peiratooo/innoextract-go v0.1.1
+	github.com/Peiratooo/innoextract-go v0.1.2
 	github.com/aliyun/aliyun-oss-go-sdk v3.0.2+incompatible
 	github.com/deploymenttheory/go-apfs-v2 v0.3.0
 	github.com/go-compressions/lzfse v0.3.0
