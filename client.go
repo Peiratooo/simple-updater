@@ -149,3 +149,9 @@ func (c *Client) GetLatestSetupInfo(system, appID string) (*Product, error) {
 	}
 	return &latest, nil
 }
+
+// GetAllSetupInfo returns all active versions for a system and app ID,
+// ordered from oldest to newest by creation time.
+func (c *Client) GetAllSetupInfo(system, appID string) ([]Product, error) {
+	return c.getAllProducts(system, appID)
+}
