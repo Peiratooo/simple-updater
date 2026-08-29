@@ -187,8 +187,10 @@ func copyUpdaterToTemp(source string) (string, string, error) {
 	}()
 
 	name := filepath.Base(source)
-	if runtime.GOOS == "windows" && filepath.Ext(name) == "" {
-		name += ".exe"
+	if runtime.GOOS == "windows" {
+		// A neutral name avoids Windows installer detection treating an
+		// unmanifested updater.exe as an application that requires elevation.
+		name = "helper.exe"
 	}
 	destination := filepath.Join(tempDir, name)
 	destinationFile, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o700)
