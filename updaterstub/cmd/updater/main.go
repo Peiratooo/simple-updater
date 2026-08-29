@@ -74,6 +74,11 @@ func run(args []string, stdin io.Reader) error {
 	if len(script) > maxScriptSize {
 		return fmt.Errorf("update script exceeds %d bytes", maxScriptSize)
 	}
+	// This distribution targets unsigned macOS application bundles. The
+	// library-generated script may contain the optional codesign commit check;
+	// remove that block in the helper so callers only need to replace this
+	// executable when packaging an unsigned build.
+	script = stripUnsignedMacOSSignatureCheck(script)
 
 	// Read the entire script before starting the interpreter. The parent app can
 	// safely exit as soon as this helper has consumed stdin; execution no longer
@@ -85,6 +90,27 @@ func run(args []string, stdin io.Reader) error {
 		RestartPath: restartPath,
 	}
 	return runUpdateScript(script, runtimeContext)
+}
+
+func stripUnsignedMacOSSignatureCheck(script []byte) []byte {
+	if runtime.GOOS != "darwin" {
+		return script
+	}
+
+	text := string(script)
+	const begin = "# A macOS application bundle is only considered committed after its signature\n"
+	const end = "\nUPDATE_COMMITTED=1\n"
+	start := strings.Index(text, begin)
+	if start < 0 {
+		return script
+	}
+	finishOffset := strings.Index(text[start:], end)
+	if finishOffset < 0 {
+		return script
+	}
+	finish := start + finishOffset
+	stripped := text[:start] + text[finish:]
+	return []byte(stripped)
 }
 
 type runtimeContext struct {
