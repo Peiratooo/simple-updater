@@ -94,6 +94,7 @@ func normalizeScriptManifest(system string, manifest []File) ([]File, error) {
 func generatePowerShellUpdateScript(files []File) string {
 	var b strings.Builder
 	b.WriteString(`$ErrorActionPreference = "Stop"
+Import-Module Microsoft.PowerShell.Utility -ErrorAction Stop
 
 $PidToWait = 0
 if ($env:SIMPLE_UPDATER_PID) {

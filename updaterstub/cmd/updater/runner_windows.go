@@ -3,7 +3,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,15 +11,30 @@ import (
 )
 
 func runUpdateScript(script []byte, runtime runtimeContext) error {
+	scriptFile, err := os.CreateTemp("", "simple-updater-script-*.ps1")
+	if err != nil {
+		return fmt.Errorf("create powershell update script: %w", err)
+	}
+	scriptPath := scriptFile.Name()
+	defer os.Remove(scriptPath)
+
+	// Windows PowerShell 5.1 needs the BOM to decode UTF-8 script files reliably.
+	if _, err := scriptFile.Write(append([]byte{0xef, 0xbb, 0xbf}, script...)); err != nil {
+		_ = scriptFile.Close()
+		return fmt.Errorf("write powershell update script: %w", err)
+	}
+	if err := scriptFile.Close(); err != nil {
+		return fmt.Errorf("close powershell update script: %w", err)
+	}
+
 	cmd := exec.Command(
 		"powershell.exe",
 		"-NoLogo",
 		"-NoProfile",
 		"-NonInteractive",
 		"-ExecutionPolicy", "Bypass",
-		"-Command", "-",
+		"-File", scriptPath,
 	)
-	cmd.Stdin = bytes.NewReader(script)
 	cmd.Dir = runtime.InstallRoot
 	cmd.Env = append(os.Environ(),
 		"SIMPLE_UPDATER_PID="+strconv.Itoa(runtime.PID),
