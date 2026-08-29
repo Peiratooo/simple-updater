@@ -5,9 +5,11 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 )
 
-func ReadProductManifest(root string) ([]File, error) {
+func ReadProductManifest(root string, excludedDirs ...string) ([]File, error) {
 	info, err := os.Stat(root)
 	if err != nil {
 		return nil, fmt.Errorf("stat project directory: %w", err)
@@ -16,16 +18,41 @@ func ReadProductManifest(root string) ([]File, error) {
 		return nil, fmt.Errorf("project path is not a directory: %s", root)
 	}
 
+	walkRoot, err := filepath.Abs(root)
+	if err != nil {
+		return nil, fmt.Errorf("get absolute project directory: %w", err)
+	}
+	normalizePath := func(path string) string {
+		path = filepath.Clean(path)
+		if runtime.GOOS == "windows" {
+			return strings.ToLower(path)
+		}
+		return path
+	}
+	excluded := make(map[string]struct{}, len(excludedDirs))
+	for _, excludedDir := range excludedDirs {
+		if strings.TrimSpace(excludedDir) == "" {
+			continue
+		}
+		if !filepath.IsAbs(excludedDir) {
+			excludedDir = filepath.Join(walkRoot, excludedDir)
+		}
+		excluded[normalizePath(excludedDir)] = struct{}{}
+	}
+
 	files := make([]File, 0)
-	err = filepath.WalkDir(root, func(filePath string, entry fs.DirEntry, walkErr error) error {
+	err = filepath.WalkDir(walkRoot, func(filePath string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
 		if entry.IsDir() {
+			if _, ok := excluded[normalizePath(filePath)]; ok {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 
-		relativePath, err := filepath.Rel(root, filePath)
+		relativePath, err := filepath.Rel(walkRoot, filePath)
 		if err != nil {
 			return fmt.Errorf("get relative path for %s: %w", filePath, err)
 		}
