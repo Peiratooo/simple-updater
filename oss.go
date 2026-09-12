@@ -11,9 +11,12 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
+	"net/url"
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 )
@@ -24,6 +27,7 @@ type OSS struct {
 	Endpoint string //
 	Bucket   string //
 	Folder   string //
+	Prefix   string // Optional download URL prefix; empty uses the OSS SDK.
 	Client   *oss.Client
 }
 
@@ -76,7 +80,30 @@ func (c *Client) uploadProduct(product *Product) error {
 	return nil
 }
 
+// DownloadFile accepts an object key, using Prefix when configured.
 func (c *Client) DownloadFile(path string) ([]byte, error) {
+	if c == nil {
+		return nil, errors.New("client is nil")
+	}
+	if strings.TrimSpace(c.Prefix) != "" {
+		address, err := c.downloadURL(path)
+		if err != nil {
+			return nil, err
+		}
+		client := &http.Client{Timeout: 5 * time.Minute}
+		response, err := client.Get(address)
+		if err != nil {
+			return nil, fmt.Errorf("download object: %w", err)
+		}
+		defer response.Body.Close()
+		if response.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("download object: HTTP %d", response.StatusCode)
+		}
+		return io.ReadAll(response.Body)
+	}
+	if c.Client == nil {
+		return nil, errors.New("OSS client is nil")
+	}
 	bucket, err := c.Client.Bucket(c.Bucket)
 	if err != nil {
 		return nil, err
@@ -91,7 +118,7 @@ func (c *Client) DownloadFile(path string) ([]byte, error) {
 }
 
 func (c *Client) DownloadPatch(files []File) ([]byte, error) {
-	if c == nil || c.Client == nil {
+	if c == nil || (c.Client == nil && strings.TrimSpace(c.Prefix) == "") {
 		return nil, errors.New("OSS client is nil")
 	}
 
@@ -210,4 +237,24 @@ func writeTarEntry(writer *tar.Writer, name string, data []byte) error {
 		return fmt.Errorf("write tar entry %s: %w", name, err)
 	}
 	return nil
+}
+
+// downloadURL appends the literal key without cleaning or parsing it.
+func (c *Client) downloadURL(objectKey string) (string, error) {
+	prefix := strings.TrimSpace(c.Prefix)
+	if !strings.Contains(prefix, "://") {
+		prefix = "https://" + prefix
+	}
+	address, err := url.Parse(prefix)
+	if err != nil {
+		return "", fmt.Errorf("parse OSS prefix: %w", err)
+	}
+	if (address.Scheme != "https" && address.Scheme != "http") ||
+		address.Hostname() == "" || address.User != nil ||
+		address.RawQuery != "" || address.ForceQuery || address.Fragment != "" || strings.Contains(prefix, "#") {
+		return "", errors.New("OSS prefix must be an HTTP(S) domain or URL without credentials, query or fragment")
+	}
+	address.Path = strings.TrimRight(address.Path, "/") + "/" + objectKey
+	address.RawPath = ""
+	return address.String(), nil
 }

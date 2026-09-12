@@ -180,6 +180,7 @@ func main() {
 			Endpoint: os.Getenv("OSS_ENDPOINT"),
 			Bucket:   os.Getenv("OSS_BUCKET"),
 			Folder:   "releases",
+			Prefix:   os.Getenv("OSS_URL_PREFIX"), // 可选，例如 https://download.example.com
 		},
 		DB: simpleupdater.DB{
 			Host:     os.Getenv("PGHOST"),
@@ -208,6 +209,10 @@ func main() {
 ~~~
 
 New 会连接 OSS 并初始化 PostgreSQL 表；当前实现初始化失败时会调用 log.Fatal 终止进程，因此生产代码应在调用前检查配置。Push 的流程是：分析安装包 → 提取产品信息和文件 → 计算大小及 SHA-256 → 生成文件名 → 上传安装包和文件 → 写入 Product 元数据。
+
+OSS.Prefix 控制下载地址：留空使用原来的 OSS SDK 和 bucket 地址；填写域名时通过该域名发起 HTTP 下载。裸域名默认使用 HTTPS，也支持完整 URL 和路径前缀，例如 https://download.example.com/downloads。
+
+Product.URL 和 File.URL 始终保存 OSS object key，上传仍使用 Endpoint。DownloadFile、DownloadPatch 和 DownloadLatestSetup 在下载时使用当前 Prefix，因此切换域名或清空 Prefix 不需要修改数据库。Folder 是对象目录，Prefix 中的路径会追加在完整 object key 前面。自定义域名下载不携带 OSS AccessKey，域名需已配置好对象访问权限或 CDN 回源；HTTP 请求超时为 5 分钟。
 
 生成的安装包文件名类似：
 
@@ -497,7 +502,7 @@ const (
 - Product：产品名、系统、包类型、版本、SHA-256、OSS URL、大小、文件清单和 UUID；Bytes 用于下载内容，Data 用于上传输入，两者都不会进入 JSON/数据库；
 - File：更新文件的路径、类型、大小、哈希、权限、符号链接目标和 OSS URL；
 - Client：嵌入 OSS 和 DB；
-- OSS：ID、Key、Endpoint、Bucket、Folder 以及初始化后的 Client；
+- OSS：ID、Key、Endpoint、Bucket、Folder、Prefix 以及初始化后的 Client；
 - DB：Host、Port、Username、Password、Database、Schema 以及初始化后的 Engine；
 - UpdaterLaunchOptions：helper 路径、旧进程 PID、安装根、补丁根、重启路径、脚本或归档输入。
 
