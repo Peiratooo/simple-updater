@@ -1,6 +1,6 @@
 module github.com/Peiratooo/simple-updater
 
-go 1.26.5
+go 1.27.3
 
 require (
 	github.com/Peiratooo/innoextract-go v0.1.2

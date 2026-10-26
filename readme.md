@@ -9,14 +9,14 @@ simple-updater 是一个面向 Windows 和 macOS 的 Go 更新组件，负责：
 
 它不是 HTTP 服务，也不包含版本发布后台。OSS 和 PostgreSQL 需要由调用方提供。
 
-本文档对应当前仓库 v0.2.0（HEAD 6190caf，Add streaming archive updates）。
+本文档对应 v0.2.8。
 
 ## 1. 安装
 
-项目要求 Go 1.26.5 或更高版本。应用项目中执行：
+项目要求 Go 1.27.3 或更高版本。应用项目中执行：
 
 ~~~bash
-go get github.com/Peiratooo/simple-updater@v0.2.0
+go get github.com/Peiratooo/simple-updater@v0.2.8
 ~~~
 
 也可以使用仓库最新标签：
