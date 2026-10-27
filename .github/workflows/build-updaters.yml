@@ -1,0 +1,74 @@
+name: Build updater binaries
+
+on:
+  push:
+    branches:
+      - ci/build-updater-artifacts-20261027
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Cross-compile Windows and macOS updaters
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Go from go.mod
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Build both updater binaries
+        run: go run ./cmd/build-updaters
+
+      - name: Verify file formats and create SHA-256 checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s dist/updater-windows-amd64.exe
+          test -s dist/updater-darwin-universal
+          file dist/updater-windows-amd64.exe dist/updater-darwin-universal
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct
+
+          windows = Path("dist/updater-windows-amd64.exe").read_bytes()
+          assert windows[:2] == b"MZ", "not a Windows PE executable"
+
+          mac = Path("dist/updater-darwin-universal").read_bytes()
+          magic, count = struct.unpack_from(">II", mac)
+          assert magic == 0xCAFEBABE, "not a universal Mach-O"
+          assert count == 2, "expected two Mach-O architectures"
+          cpu_types = set()
+          for index in range(count):
+              cpu_type, _subcpu, offset, size, _align = struct.unpack_from(">IIIII", mac, 8 + 20 * index)
+              assert size > 0 and offset + size <= len(mac), "invalid Mach-O slice"
+              cpu_types.add(cpu_type)
+          assert cpu_types == {0x01000007, 0x0100000C}, f"unexpected architectures: {cpu_types}"
+          print("Verified Windows PE + macOS Intel/Apple Silicon Universal Mach-O")
+          PY
+          (
+            cd dist
+            sha256sum updater-windows-amd64.exe updater-darwin-universal > SHA256SUMS.txt
+            cat SHA256SUMS.txt
+          )
+
+      - name: Upload binaries for manual GitHub Release
+        uses: actions/upload-artifact@v4
+        with:
+          name: updater-windows-macos
+          path: |
+            dist/updater-windows-amd64.exe
+            dist/updater-darwin-universal
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
